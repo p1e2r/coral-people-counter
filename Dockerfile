@@ -37,7 +37,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DATA_DIR=/data \
     PORT=8080
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Bullseye is end-of-life: its packages now live on archive.debian.org. It stays the
+# base because Google's Coral runtime (libedgetpu 16 + tflite-runtime 2.5) targets it.
+RUN printf 'deb http://archive.debian.org/debian bullseye main\ndeb http://archive.debian.org/debian-security bullseye-security main\n' \
+        > /etc/apt/sources.list \
+    && rm -f /etc/apt/sources.list.d/debian.sources \
+    && echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99archive \
+    && apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl gnupg tzdata \
     && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
         | gpg --dearmor -o /usr/share/keyrings/coral-edgetpu.gpg \

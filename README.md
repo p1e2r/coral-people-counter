@@ -45,7 +45,7 @@ General models are trained on side and angled photos, so they miss most people s
 6. **Counting rules.** There is a dead zone around the line, so standing on it doesn't flicker the count. A person is never counted on a predicted position, only on a real detection. Someone who steps over the line and back within 3 seconds has their count taken back.
 7. **Verify it yourself.** Every count saves a snapshot, shown under **Recent counts**. Remove a wrong count with ×. Check a few dozen after setup and adjust the settings.
 
-**Measured on real video** (`tests/accuracy/`): 31 people crossing a line in OpenCV's pedestrian video. The default EfficientDet-Lite1 counted **31 of 31 correctly, with no extras and no misses**. MobileDet scored 28 of 31, and the old SSD MobileNet 23 of 31. Full tables, including person detection on COCO128, are in `tests/accuracy/README.md`. They are rerun in CI after every image build.
+**Measured on real video** (`tests/accuracy/`): 31 people crossing a line in OpenCV's pedestrian video. The default EfficientDet-Lite1 counted 29–31 of 31 correctly with no false counts (F1 96.7–100%). EfficientDet-Lite2 was perfect, 31 of 31, in both test environments. MobileDet scored 28 of 31, and the old SSD MobileNet 21–23 of 31. Full tables, including person detection on COCO128, are in `tests/accuracy/README.md`. They are rerun in CI after every image build.
 
 In a simulated test of 944 people per condition (jitter, 15% missed detections, occlusions, people crossing paths, people turning back), the total count error dropped from about ±10% with the previous tracker to about ±3%.
 

@@ -1,0 +1,48 @@
+services:
+  people-counter:
+    build:
+      context: .
+      # args:
+      #   TOPDOWN: "1"            # build the top-down (overhead) model, 0 = skip
+      #   TOPDOWN_MODEL: Yolo_v8_n   # or Yolo_v11_n
+    image: coral-people-counter:latest
+    container_name: people-counter
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Asia/Jakarta            # all per-hour/day/year stats use this time zone
+
+      # ---- pick ONE camera (you can also change it later in the web UI → Camera) ----
+      # USB webcam:
+      SOURCE: "/dev/video0"
+      # Any RTSP / RTSPS / HTTP stream (passwords with special characters can be typed as-is):
+      # SOURCE: "rtsp://admin:password@192.168.1.64:554/Streaming/Channels/101"
+      # SOURCE: "rtsps://admin:password@192.168.1.64:322/Streaming/Channels/101"
+      # Hikvision camera or NVR (overrides SOURCE):
+      # HIK_HOST: 192.168.1.64
+      # HIK_USER: admin
+      # HIK_PASS: "your password"
+      # HIK_CHANNEL: "1"          # NVR channel, 1 = first camera
+      # HIK_STREAM: sub           # main | sub | third  (sub is plenty for counting)
+      # HIK_TLS: "1"              # 1 = RTSPS (port 322), 0 = RTSP (port 554)
+      # HIK_PORT: "554"           # only if you changed the camera's port
+      # Demo without hardware:
+      # SOURCE: demo
+
+      # CAMERA_VIEW: topdown      # angled (default) | topdown — or use the switch in the web UI
+      # COUNT_MODE: line          # line (people crossing a line) | unique (every new person)
+      # THRESHOLD: "0.5"
+      # MAX_FPS: "15"
+      # ADMIN_TOKEN: change-me    # protects settings, camera and reset in the web UI
+      # SITE_NAME: "Front door"
+    volumes:
+      - ./data:/data
+    devices:
+      # The Coral USB Accelerator changes its USB ID after firmware load,
+      # so the whole USB bus is passed through rather than a single device.
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/video0:/dev/video0   # USB webcam — delete this line if you only use network cameras
+    device_cgroup_rules:
+      - "c 189:* rmw"             # USB devices (needed after the Coral re-enumerates)
+      - "c 81:* rmw"              # video4linux (webcams plugged in later)

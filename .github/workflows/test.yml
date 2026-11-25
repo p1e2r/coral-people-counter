@@ -1,0 +1,43 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install app dependencies
+        run: pip install numpy opencv-python-headless flask waitress
+      - name: Syntax check
+        run: python -m py_compile app/*.py scripts/*.py tests/*.py
+      - name: JavaScript syntax check
+        run: node --check app/static/app.js
+      - name: Tracker counting-accuracy test (fails above 5% error)
+        run: PYTHONPATH=app python tests/tracker_sim.py --check
+      - name: Smoke test web app (demo camera)
+        run: |
+          mkdir -p /tmp/data
+          DATA_DIR=/tmp/data SOURCE=demo PORT=8080 python app/main.py > /tmp/app.log 2>&1 &
+          for i in $(seq 1 30); do curl -fs localhost:8080/healthz && break; sleep 1; done
+          sleep 20   # let synthetic people walk across the line
+          curl -fs localhost:8080/ > /dev/null
+          for u in summary hourly "daily?days=7" "monthly?year=2026" yearly settings camera models recent; do
+            curl -fs "localhost:8080/api/$u" > /dev/null || { echo "FAILED /api/$u"; cat /tmp/app.log; exit 1; }
+          done
+          curl -fs localhost:8080/snapshot.jpg -o /tmp/snap.jpg
+          today=$(curl -fs localhost:8080/api/summary | python -c "import json,sys;print(json.load(sys.stdin)['today'])")
+          echo "people counted in smoke test: $today"
+          test "$today" -gt 0 || { cat /tmp/app.log; exit 1; }
+          ! grep -q "pipeline crashed" /tmp/app.log

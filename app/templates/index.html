@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ site_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='chart.umd.min.js') }}"></script>
+</head>
+<body data-admin-required="{{ 'true' if admin_required else 'false' }}">
+<header>
+  <div class="brand">
+    <span class="dot" id="statusDot"></span>
+    <h1>{{ site_name }}</h1>
+  </div>
+  <div class="meta" id="meta">connecting…</div>
+</header>
+
+<main>
+  <section class="kpis">
+    <div class="kpi"><span>This hour</span><strong id="k_hour">–</strong></div>
+    <div class="kpi accent"><span>Today</span><strong id="k_today">–</strong><small id="k_inout"></small></div>
+    <div class="kpi"><span>This month</span><strong id="k_month">–</strong></div>
+    <div class="kpi"><span>This year</span><strong id="k_year">–</strong></div>
+    <div class="kpi"><span>All time</span><strong id="k_all">–</strong><small id="k_since"></small></div>
+    <div class="kpi"><span>In view now</span><strong id="k_now">–</strong><small id="k_busiest"></small></div>
+  </section>
+
+  <section class="grid">
+    <div class="card live">
+      <div class="card-head">
+        <h2>Live camera</h2>
+        <div class="seg seg-sm" id="viewSeg" title="How the camera is mounted — picks the detection model">
+          <button type="button" data-view="angled">Angled</button>
+          <button type="button" data-view="topdown">Top-down</button>
+        </div>
+        <div class="tools">
+          <button id="editLine" class="ghost">Draw count line</button>
+          <button id="editZone" class="ghost">Detection zone</button>
+          <button id="cameraBtn" class="ghost">Camera</button>
+          <button id="settingsBtn" class="ghost">Settings</button>
+        </div>
+      </div>
+      <div class="warn" id="viewWarn" hidden></div>
+      <div class="video-wrap" id="videoWrap">
+        <img id="video" src="/video_feed" alt="live camera">
+        <div class="hint" id="lineHint" hidden>Click the start point, then the end point of the line</div>
+        <div class="zone-box" id="zoneBox" hidden></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Per hour</h2>
+        <input type="date" id="hourDate">
+      </div>
+      <div class="chart"><canvas id="hourChart"></canvas></div>
+    </div>
+
+    <div class="card wide">
+      <div class="card-head">
+        <h2>Per day</h2>
+        <div class="tools">
+          <select id="dayMode">
+            <option value="last30">Last 30 days</option>
+            <option value="month">Pick a month</option>
+          </select>
+          <input type="month" id="dayMonth" hidden>
+        </div>
+      </div>
+      <div class="chart"><canvas id="dayChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Per month</h2>
+        <select id="monthYear"></select>
+      </div>
+      <div class="chart"><canvas id="monthChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Per year</h2></div>
+      <div class="chart"><canvas id="yearChart"></canvas></div>
+    </div>
+
+    <div class="card wide">
+      <div class="card-head">
+        <h2>Recent counts</h2>
+        <span class="muted small">Check these to verify accuracy · click × on a wrong one to remove it</span>
+      </div>
+      <div class="recent" id="recent"><p class="muted small">No counts yet.</p></div>
+    </div>
+
+    <div class="card wide">
+      <div class="card-head">
+        <h2>Busiest hours (all time)</h2>
+        <a class="ghost btn" href="/api/export.csv">Export CSV</a>
+      </div>
+      <div class="chart short"><canvas id="profileChart"></canvas></div>
+    </div>
+  </section>
+</main>
+
+<dialog id="settingsDlg">
+  <form method="dialog" id="settingsForm">
+    <h2>Counter settings</h2>
+    <label>Counting mode
+      <select name="mode">
+        <option value="line">Line crossing (people passing a line)</option>
+        <option value="unique">Every new person seen</option>
+      </select>
+    </label>
+    <label>Count direction
+      <select name="count_dirs">
+        <option value="both">Both directions</option>
+        <option value="in">Only "in"</option>
+        <option value="out">Only "out"</option>
+      </select>
+    </label>
+    <label class="row"><input type="checkbox" name="invert"> Swap in/out direction</label>
+    <label>Detection model for the angled view
+      <select name="model" id="modelSelect"></select>
+    </label>
+    <p class="note" id="topdownNote"></p>
+    <label>Tiling
+      <select name="tiles">
+        <option value="auto">Auto — near-square tiles, no squashing (recommended)</option>
+        <option value="1">Off — whole zone in one pass (fastest)</option>
+        <option value="2">2 tiles</option>
+        <option value="3">3 tiles</option>
+        <option value="4">4 tiles (2×2) — small / distant people</option>
+        <option value="6">6 tiles (3×2) — very small people</option>
+      </select>
+    </label>
+    <label id="anchorRow">Point that must cross the line
+      <select name="anchor">
+        <option value="center">Body centre (general)</option>
+        <option value="bottom">Feet (line drawn on the floor)</option>
+        <option value="top">Head (high camera, crowds)</option>
+      </select>
+    </label>
+    <label class="row"><input type="checkbox" name="snapshots"> Save a snapshot of every count</label>
+    <label>Detection confidence <output id="thOut"></output>
+      <input type="range" name="threshold" min="0.2" max="0.9" step="0.05">
+    </label>
+    <label>Frames before a person counts
+      <input type="number" name="min_hits" min="1" max="30">
+    </label>
+    <label id="tokenRow" hidden>Admin token
+      <input type="password" name="token" autocomplete="off">
+    </label>
+    <div class="actions">
+      <button type="button" class="danger ghost" id="resetBtn">Reset all counts</button>
+      <span class="spacer"></span>
+      <button value="cancel" class="ghost">Cancel</button>
+      <button id="saveBtn" value="default">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="cameraDlg" class="wide-dlg">
+  <form method="dialog" id="cameraForm">
+    <h2>Camera</h2>
+    <div class="seg" id="camType">
+      <button type="button" data-type="usb">USB webcam</button>
+      <button type="button" data-type="url">RTSP / RTSPS</button>
+      <button type="button" data-type="hikvision">Hikvision</button>
+      <button type="button" data-type="demo">Demo</button>
+    </div>
+
+    <div class="pane" data-pane="usb">
+      <label>Device
+        <select name="usb_device" id="usbDevices"></select>
+      </label>
+      <div class="cols3">
+        <label>Width <input name="usb_width" type="number" placeholder="auto"></label>
+        <label>Height <input name="usb_height" type="number" placeholder="auto"></label>
+        <label>FPS <input name="usb_fps" type="number" placeholder="auto"></label>
+      </div>
+      <p class="note">No devices listed? Pass the webcam into the container (<code>devices: - /dev/video0</code>).</p>
+    </div>
+
+    <div class="pane" data-pane="url">
+      <label>Stream URL
+        <input name="url" placeholder="rtsps://user:pass@192.168.1.20:322/stream" autocomplete="off" spellcheck="false">
+      </label>
+      <label>RTSP transport
+        <select name="transport"><option value="tcp">TCP (recommended)</option><option value="udp">UDP</option></select>
+      </label>
+      <p class="note">Works with <code>rtsp://</code>, <code>rtsps://</code> (TLS, self-signed certificates are accepted), <code>http(s)://</code> MJPEG/HLS and video files. Passwords with special characters can be typed as-is.</p>
+    </div>
+
+    <div class="pane" data-pane="hikvision">
+      <div class="cols2">
+        <label>Camera / NVR IP or host <input name="hik_host" placeholder="192.168.1.64" autocomplete="off"></label>
+        <label>Port <input name="hik_port" type="number" placeholder="554"></label>
+        <label>Username <input name="hik_user" placeholder="admin" autocomplete="off"></label>
+        <label>Password <input name="hik_pass" type="password" autocomplete="new-password"></label>
+        <label>Channel <input name="hik_channel" type="number" min="1" value="1"></label>
+        <label>Stream
+          <select name="hik_stream">
+            <option value="main">Main stream (x01)</option>
+            <option value="sub">Sub stream (x02) — lighter</option>
+            <option value="third">Third stream (x03)</option>
+          </select>
+        </label>
+      </div>
+      <label class="row"><input type="checkbox" name="hik_tls"> Secure RTSPS (TLS, default port 322)</label>
+      <p class="note" id="hikUrl"></p>
+    </div>
+
+    <div class="pane" data-pane="demo"><p class="note">Synthetic people walking across the frame, for trying out the dashboard.</p></div>
+
+    <div id="camTest" class="cam-test" hidden></div>
+    <div class="actions">
+      <button type="button" class="ghost" id="camTestBtn">Test connection</button>
+      <span class="spacer"></span>
+      <button value="cancel" class="ghost">Cancel</button>
+      <button id="camSaveBtn" value="default">Save &amp; switch</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

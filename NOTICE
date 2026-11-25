@@ -1,0 +1,16 @@
+Coral People Counter
+Copyright (c) 2026 Andrew Suryanto — MIT License (see LICENSE)
+
+Third-party components downloaded at image build time:
+
+1. Top-down person model (YOLOv8n / YOLO11n, top-view people)
+   Hernando Cánovas L., Martínez-Sala A. S., Aarnoutse-Sánchez J. C., Alcaráz-Espín J. J.
+   "YOLO-based models trained via transfer learning with top-view person image annotations",
+   Universidad Politécnica de Cartagena, 2025. https://doi.org/10.5281/zenodo.15731095
+   License: Creative Commons Attribution 4.0 International (CC BY 4.0).
+   Changes: converted to full-integer TFLite and compiled for the Coral Edge TPU.
+
+2. Object detection models (SSD MobileNet v2, SSDLite MobileDet, EfficientDet-Lite)
+   Google Coral test data, https://github.com/google-coral/test_data — Apache License 2.0.
+
+3. Chart.js — MIT License. ffmpeg (static build by mwader/static-ffmpeg) — LGPL/GPL.

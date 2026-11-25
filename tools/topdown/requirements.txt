@@ -1,0 +1,12 @@
+# Versions verified to export YOLO -> full-integer TFLite -> Edge TPU (Nov 2026)
+ultralytics==8.4.218
+tensorflow==2.21.0
+tf_keras==2.21.0
+onnx==1.23.2
+onnx2tf==1.28.8
+onnx_graphsurgeon==0.6.1
+onnxruntime==1.32.0
+onnxslim==0.1.99
+sng4onnx==2.0.1
+ai-edge-litert==2.4.0
+protobuf==7.36.2

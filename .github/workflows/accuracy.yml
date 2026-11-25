@@ -1,0 +1,49 @@
+name: accuracy
+
+# Runs the real-data accuracy tests inside the published image after each image build,
+# or on demand. Fails if the default model's counting F1 on real video drops below 95 %.
+on:
+  workflow_run:
+    workflows: [docker]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  accuracy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch test data (COCO128 + OpenCV vtest.avi)
+        run: ACC_DATA=$PWD/acc-data bash tests/accuracy/fetch_data.sh
+      - name: Pick image
+        id: img
+        run: echo "ref=ghcr.io/${{ github.repository }}:sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Counting accuracy on real pedestrian video (gate 95 % F1)
+        run: |
+          docker run --rm -v "$PWD/tests:/tests:ro" -v "$PWD/acc-data:/acc:ro" -e ACC_DATA=/acc \
+            --entrypoint python3 "${{ steps.img.outputs.ref }}" /tests/accuracy/count_eval.py --check \
+            2>&1 | tee count.txt
+      - name: Detection accuracy on COCO128
+        run: |
+          docker run --rm -v "$PWD/tests:/tests:ro" -v "$PWD/acc-data:/acc:ro" -e ACC_DATA=/acc \
+            --entrypoint python3 "${{ steps.img.outputs.ref }}" /tests/accuracy/det_eval.py \
+            2>&1 | tee det.txt
+      - name: Summary
+        if: always()
+        run: |
+          { echo '## Counting accuracy (real video, 31 crossings)'; echo '```'; cat count.txt 2>/dev/null | grep -v -i "edge tpu unavailable"; echo '```';
+            echo '## Person detection (COCO128)'; echo '```'; cat det.txt 2>/dev/null | grep -v -i "edge tpu unavailable"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

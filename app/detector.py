@@ -26,17 +26,18 @@ MODEL_DIR = os.environ.get("MODEL_DIR", "/models")
 # name: (file stem, label, note, kind, view)
 MODELS = {
     "mobiledet": ("ssdlite_mobiledet_coco_qat_postprocess", "SSDLite MobileDet 320",
-                  "Recommended: much more accurate than SSD MobileNet, still ~9 ms on Coral", "ssd", "angled"),
+                  "fast, good (95% counting F1 in tests)", "ssd", "angled"),
     "efficientdet_lite0": ("efficientdet_lite0_320_ptq", "EfficientDet-Lite0 320", "accurate on large people", "ssd", "angled"),
-    "efficientdet_lite1": ("efficientdet_lite1_384_ptq", "EfficientDet-Lite1 384", "", "ssd", "angled"),
-    "efficientdet_lite2": ("efficientdet_lite2_448_ptq", "EfficientDet-Lite2 448", "very precise, slower", "ssd", "angled"),
+    "efficientdet_lite1": ("efficientdet_lite1_384_ptq", "EfficientDet-Lite1 384",
+                           "Recommended: most accurate in tests (31/31 crossings counted correctly)", "ssd", "angled"),
+    "efficientdet_lite2": ("efficientdet_lite2_448_ptq", "EfficientDet-Lite2 448", "as accurate as Lite1, slower", "ssd", "angled"),
     "efficientdet_lite3": ("efficientdet_lite3_512_ptq", "EfficientDet-Lite3 512", "very precise, slow", "ssd", "angled"),
-    "efficientdet_lite3x": ("efficientdet_lite3x_640_ptq", "EfficientDet-Lite3x 640", "most precise, slowest", "ssd", "angled"),
+    "efficientdet_lite3x": ("efficientdet_lite3x_640_ptq", "EfficientDet-Lite3x 640", "slowest; best on still photos, worse on video", "ssd", "angled"),
     "ssd_mobilenet_v2": ("ssd_mobilenet_v2_coco_quant_postprocess", "SSD MobileNet v2 300", "fastest, least accurate", "ssd", "angled"),
     "topdown": ("topdown", "Top-down YOLOv8n (overhead people)",
                 "trained on top-view people, UPCT 2025, CC BY 4.0", "yolo", "topdown"),
 }
-DEFAULT_MODEL = "mobiledet"
+DEFAULT_MODEL = "efficientdet_lite1"
 TOPDOWN_MODEL = "topdown"
 # /data/models first, so you can drop in your own (re)trained files without rebuilding
 MODEL_DIRS = [d for d in os.environ.get("MODEL_DIRS", "/data/models:" + MODEL_DIR).split(":") if d]
@@ -57,7 +58,9 @@ def model_available(key):
 
 def model_list(view=None):
     out = []
-    for key, (stem, label, note, kind, v) in MODELS.items():
+    keys = [DEFAULT_MODEL] + [k for k in MODELS if k != DEFAULT_MODEL]  # recommended first
+    for key in keys:
+        stem, label, note, kind, v = MODELS[key]
         if (view is None or v == view) and model_available(key):
             out.append({"id": key, "label": label, "note": note, "view": v})
     return out

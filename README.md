@@ -32,7 +32,7 @@ General models are trained on side and angled photos, so they miss most people s
 
 ## How accuracy is maximised
 
-1. **Better model.** SSDLite MobileDet is the default. It has 32.9% COCO mAP against 22.4% for the classic SSD MobileNet v2, and still runs in about 9 ms on the Coral. EfficientDet-Lite0 to Lite3x can be picked in Settings. They are more precise on large, close people but slower, and they find fewer small or distant people.
+1. **Better model.** EfficientDet-Lite1 is the default, because it was the most accurate in the real-video counting test. SSDLite MobileDet (faster) and the other EfficientDet-Lite sizes can be picked in Settings.
 2. **Aspect-correct tiling.** Squashing a 16:9 frame into the model's square input makes people thin and easy to miss. The frame is split into overlapping near-square tiles instead, and the results are merged. A person cut by a tile border is joined back into one box. Use 4 or 6 tiles if people are small in the image.
 3. **Detection zone.** Draw a box around the area where people walk. Only that area goes to the model, so people take up more of its input, and anything outside (roads, TVs, posters) is ignored.
 4. **Clean-up filters.** Boxes more than 1.8× wider than tall are dropped, since they aren't people. Half-body duplicates sitting inside a stronger box are also dropped. A person who is partly hidden still sticks out of the front person's box, so they are kept.
@@ -44,6 +44,8 @@ General models are trained on side and angled photos, so they miss most people s
    - Tracks are dropped once the person walks out of the frame, so a newcomer at the same edge doesn't inherit the old ID.
 6. **Counting rules.** There is a dead zone around the line, so standing on it doesn't flicker the count. A person is never counted on a predicted position, only on a real detection. Someone who steps over the line and back within 3 seconds has their count taken back.
 7. **Verify it yourself.** Every count saves a snapshot, shown under **Recent counts**. Remove a wrong count with ×. Check a few dozen after setup and adjust the settings.
+
+**Measured on real video** (`tests/accuracy/`): 31 people crossing a line in OpenCV's pedestrian video. The default EfficientDet-Lite1 counted **31 of 31 correctly, with no extras and no misses**. MobileDet scored 28 of 31, and the old SSD MobileNet 23 of 31. Full tables, including person detection on COCO128, are in `tests/accuracy/README.md`. They are rerun in CI after every image build.
 
 In a simulated test of 944 people per condition (jitter, 15% missed detections, occlusions, people crossing paths, people turning back), the total count error dropped from about ±10% with the previous tracker to about ±3%.
 
@@ -119,7 +121,7 @@ A camera chosen in the UI is saved and takes priority over the environment varia
 | `COUNT_LINE` | `0.5,0.05,0.5,0.95` | Line `x1,y1,x2,y2` as fractions of the frame (can also be drawn in the UI) |
 | `THRESHOLD` | `0.45` | Confidence for a confident detection (the tracker also uses ones down to half of this) |
 | `CAMERA_VIEW` | `angled` | `angled` or `topdown` (also switchable in the UI) |
-| `MODEL` | `mobiledet` | `mobiledet`, `efficientdet_lite0` … `efficientdet_lite3x`, `ssd_mobilenet_v2` |
+| `MODEL` | `efficientdet_lite1` | `mobiledet`, `efficientdet_lite0` … `efficientdet_lite3x`, `ssd_mobilenet_v2` |
 | `TILES` | `auto` | `auto`, `1`, `2`, `3`, `4`, `6` |
 | `ANCHOR` | `center` | `center`, `bottom` (feet), `top` (head) |
 | `SNAPSHOT_KEEP` | `500` | How many count snapshots to keep |

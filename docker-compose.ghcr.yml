@@ -1,0 +1,45 @@
+# Coral People Counter — run the prebuilt image (no build needed)
+#   docker compose -f docker-compose.ghcr.yml up -d
+#   then open http://<server-ip>:8080
+# Update later with:  docker compose -f docker-compose.ghcr.yml pull && docker compose -f docker-compose.ghcr.yml up -d
+
+services:
+  people-counter:
+    image: ghcr.io/p1e2r/coral-people-counter:latest
+    container_name: people-counter
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Asia/Jakarta              # all hour/day/month/year stats use this time zone
+      SITE_NAME: "People Counter"
+      ADMIN_TOKEN: change-me        # protects Settings, Camera and Reset in the web UI
+
+      # ---- Camera: pick ONE (or leave as demo and set it in the web UI → Camera) ----
+      SOURCE: demo
+      # USB webcam (also uncomment /dev/video0 under devices):
+      # SOURCE: /dev/video0
+      # Any RTSP / RTSPS stream (passwords with special characters can be typed as-is):
+      # SOURCE: "rtsp://admin:password@192.168.1.64:554/Streaming/Channels/102"
+      # Hikvision camera or NVR (overrides SOURCE):
+      # HIK_HOST: 192.168.1.64
+      # HIK_USER: admin
+      # HIK_PASS: "your password"
+      # HIK_CHANNEL: "1"            # NVR channel, 1 = first camera
+      # HIK_STREAM: sub             # sub is plenty for counting; main for far-away people
+      # HIK_TLS: "0"                # 1 = RTSPS (port 322)
+
+      # ---- Detection (all of these can also be changed in the web UI) ----
+      # CAMERA_VIEW: angled         # angled | topdown (camera looking straight down)
+      # MODEL: efficientdet_lite1   # default; efficientdet_lite2 = most accurate in tests, slower
+      # MAX_FPS: "15"
+    volumes:
+      - ./data:/data                # database, settings, count snapshots, optional custom models
+    devices:
+      # Coral USB Accelerator: it changes USB ID after loading firmware,
+      # so the whole USB bus is passed through.
+      - /dev/bus/usb:/dev/bus/usb
+      # - /dev/video0:/dev/video0   # USB webcam only
+    device_cgroup_rules:
+      - "c 189:* rmw"               # USB devices (Coral re-enumerates after firmware load)
+      - "c 81:* rmw"                # video4linux (webcams)

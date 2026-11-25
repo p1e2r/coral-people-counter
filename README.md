@@ -65,7 +65,7 @@ In a simulated test of 944 people per condition (jitter, 15% missed detections, 
 ```bash
 docker pull ghcr.io/p1e2r/coral-people-counter:latest   # amd64 + arm64
 ```
-In `docker-compose.yml`, replace `build:` with `image: ghcr.io/p1e2r/coral-people-counter:latest`.
+Or use the ready-made compose file: `docker compose -f docker-compose.ghcr.yml up -d`, then open `http://<server>:8080`.
 
 ## Quick start (build yourself)
 

@@ -23,13 +23,17 @@ RUN if [ "$TOPDOWN" = "1" ]; then \
       OUT=/out TOPDOWN_MODEL=$TOPDOWN_MODEL TOPDOWN_IMGSZ=$TOPDOWN_IMGSZ bash /build_topdown.sh; \
     else mkdir -p /out && echo "disabled at build time (TOPDOWN=0)" > /out/TOPDOWN_FAILED.txt; fi
 
-# Coral People Counter
-# Debian bullseye is used because Google's Coral apt repo (libedgetpu + tflite-runtime)
-# ships packages built for its Python 3.9. Works on amd64 and arm64 (Raspberry Pi 4/5).
-FROM debian:bullseye-slim
+# Coral People Counter — runtime image
+# Google retired its Coral apt repo, so the Edge TPU runtime comes from feranick's
+# maintained builds (as used by Frigate): libedgetpu 16.0 built against TF 2.17.1
+# and the matching tflite_runtime 2.17.1 wheel, for Debian bookworm / Python 3.11.
+FROM debian:bookworm-slim
 
-ARG EDGETPU_RUNTIME=libedgetpu1-std
-# use libedgetpu1-max for full clock speed (runs hotter)
+ARG TARGETARCH
+ARG EDGETPU_RUNTIME=std
+# EDGETPU_RUNTIME=max for full clock speed (faster, runs hotter)
+ARG LIBEDGETPU_VERSION=16.0TF2.17.1-1
+ARG TFLITE_VERSION=2.17.1
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -37,28 +41,22 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DATA_DIR=/data \
     PORT=8080
 
-# Bullseye is end-of-life: its packages now live on archive.debian.org. It stays the
-# base because Google's Coral runtime (libedgetpu 16 + tflite-runtime 2.5) targets it.
-RUN printf 'deb http://archive.debian.org/debian bullseye main\ndeb http://archive.debian.org/debian-security bullseye-security main\n' \
-        > /etc/apt/sources.list \
-    && rm -f /etc/apt/sources.list.d/debian.sources \
-    && echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99archive \
-    && apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates curl gnupg tzdata \
-    && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-        | gpg --dearmor -o /usr/share/keyrings/coral-edgetpu.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/coral-edgetpu.gpg] https://packages.cloud.google.com/apt coral-edgetpu-stable main" \
-        > /etc/apt/sources.list.d/coral-edgetpu.list \
-    && apt-get update && apt-get install -y --no-install-recommends \
-        ${EDGETPU_RUNTIME} \
-        python3-tflite-runtime \
-        python3-numpy \
-        python3-opencv \
-        python3-flask \
-        python3-waitress \
-        usbutils \
-    && apt-get purge -y gnupg && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl tzdata usbutils libusb-1.0-0 \
+        python3 python3-pip python3-numpy python3-opencv python3-flask python3-waitress \
+    && case "$TARGETARCH" in \
+         amd64) DEB_ARCH=amd64; WHL_ARCH=x86_64 ;; \
+         arm64) DEB_ARCH=arm64; WHL_ARCH=aarch64 ;; \
+         *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
+       esac \
+    && ver_lc=$(echo "$LIBEDGETPU_VERSION" | sed 's/TF/tf/') \
+    && cd /tmp \
+    && curl -fsSLO "https://github.com/feranick/libedgetpu/releases/download/${LIBEDGETPU_VERSION}/libedgetpu1-${EDGETPU_RUNTIME}_${ver_lc}.bookworm_${DEB_ARCH}.deb" \
+    && apt-get install -y --no-install-recommends ./libedgetpu1-*.deb \
+    && curl -fsSLO "https://github.com/feranick/TFlite-builds/releases/download/v${TFLITE_VERSION}/tflite_runtime-${TFLITE_VERSION}-cp311-cp311-linux_${WHL_ARCH}.whl" \
+    && pip3 install --no-cache-dir --break-system-packages ./tflite_runtime-*.whl \
+    && python3 -c "import tflite_runtime.interpreter, cv2, flask, waitress, numpy; print('runtime ok', numpy.__version__, cv2.__version__)" \
+    && rm -rf /tmp/*.deb /tmp/*.whl /var/lib/apt/lists/*
 
 # Person-detection models (COCO; "person" = class 0), each as Edge TPU build + CPU fallback.
 # Default is SSDLite MobileDet; the others can be chosen in the web UI (Settings → Model).

@@ -56,3 +56,14 @@ jobs:
           img=ghcr.io/${{ github.repository }}:sha-$(git rev-parse --short HEAD)
           docker run --rm --entrypoint sh "$img" -c 'ls -la /models; if [ -f /models/TOPDOWN_FAILED.txt ]; then cat /models/TOPDOWN_FAILED.txt; echo "::warning::top-down model was not built"; fi'
           docker run --rm --entrypoint python3 "$img" -c "import detector; print(detector.model_list()); print(detector.topdown_status())"
+      - name: Inference smoke test inside the image (CPU fallback, no Coral on runners)
+        if: github.event_name != 'pull_request'
+        run: |
+          img=ghcr.io/${{ github.repository }}:sha-$(git rev-parse --short HEAD)
+          docker run --rm --entrypoint python3 "$img" -c "
+          import numpy as np, detector
+          frame = np.random.randint(0, 255, (720, 1280, 3), np.uint8)
+          for key in ['mobiledet', 'efficientdet_lite0'] + (['topdown'] if detector.model_available('topdown') else []):
+              d = detector.TFLiteDetector(key)
+              print(key, d.backend, 'boxes:', len(d.detect(frame, 0.3)))
+          "
